@@ -1,0 +1,21 @@
+# Virtual environment
+venv/
+
+# API keys — never push these!
+.env
+.streamlit/secrets.toml
+
+# FAISS index
+faiss_index/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test files
+debug.py
