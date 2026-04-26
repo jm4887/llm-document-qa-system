@@ -1,28 +1,45 @@
-# LLM Document QA System
+# 📄 LLM Document QA System
 
 A **Retrieval-Augmented Generation (RAG)** pipeline that lets you ask natural-language
 questions about your PDF, DOCX, and TXT documents — grounded entirely in their content.
+No hallucination. Every answer is cited from the source document.
 
-Built with LangChain, OpenAI Embeddings, FAISS, and Streamlit.
+Built with **LangChain · HuggingFace Embeddings · Llama 3.3 via Groq · FAISS · Streamlit**
+
+> 🚀 **Live Demo:** [your-app.streamlit.app](https://your-app.streamlit.app) ← update this after deploying
 
 ---
 
-## Architecture
+## ✨ Features
+
+- 📁 Upload **PDF, DOCX, and TXT** files
+- 🔍 **Semantic search** using local HuggingFace embeddings (no API cost)
+- 🤖 **Llama 3.3 70B** via Groq for fast, accurate answers (free tier)
+- 🛡️ **Anti-hallucination** — model only answers from your documents
+- 📎 **Source citations** — every answer quotes the exact document text
+- ⚡ **Auto context mode** — full document for small files, retrieval for large ones
+- 🌐 **Web UI** via Streamlit + **CLI** for terminal use
+
+---
+
+## 🏗️ Architecture
 
 ```
 Documents (PDF / DOCX / TXT)
        ↓
   [document_loader.py]   — parse into LangChain Document objects
        ↓
-  RecursiveCharacterTextSplitter — 800-char chunks, 100-char overlap
+  RecursiveCharacterTextSplitter — 1500-char chunks, 200-char overlap
        ↓
-  OpenAI text-embedding-3-small  — convert each chunk to a 1536-dim vector
+  HuggingFace all-MiniLM-L6-v2  — local embeddings, no API needed
        ↓
-  FAISS vector store             — in-memory approximate nearest-neighbor index
+  FAISS vector store             — in-memory similarity search
        ↓ (at query time)
-  User query → embed → similarity search → top-4 chunks
+  Auto k-selection:
+    Small doc (< 15k chars) → send full document to LLM
+    Large doc               → similarity search → top-k chunks
        ↓
-  ChatOpenAI (gpt-4o-mini)       — synthesize answer from retrieved chunks
+  Llama 3.3 70B via Groq  — synthesize grounded answer
        ↓
   Answer + source citations
 ```
@@ -30,49 +47,48 @@ Documents (PDF / DOCX / TXT)
 ### Why RAG?
 
 Standard LLMs hallucinate when asked about documents they haven't seen. RAG solves this
-by retrieving relevant passages *first*, then having the LLM answer *only* from those
+by retrieving relevant passages first, then having the LLM answer ONLY from those
 passages. The model never has to guess — it just reads and synthesizes.
 
 ---
 
-## Quickstart
+## 🚀 Quickstart
 
-### 1. Install dependencies
+### 1. Clone the repo
+
+```bash
+git clone https://github.com/jm4887/llm-document-qa-system.git
+cd llm-document-qa-system
+```
+
+### 2. Create virtual environment
 
 ```bash
 python -m venv venv
-source venv/bin/activate          # Windows: venv\Scripts\activate
+venv\Scripts\activate       # Windows
+source venv/bin/activate    # Mac/Linux
+```
+
+### 3. Install dependencies
+
+```bash
 pip install -r requirements.txt
 ```
 
-### 2. Set your OpenAI API key
+### 4. Get a free Groq API key
+
+1. Go to https://console.groq.com
+2. Sign in with Google → API Keys → Create API Key
+3. Copy the key (starts with gsk_...)
+
+### 5. Set your API key
 
 ```bash
-export OPENAI_API_KEY="sk-..."    # Mac/Linux
-set OPENAI_API_KEY=sk-...         # Windows CMD
+set GROQ_API_KEY=gsk_your_key_here      # Windows
+export GROQ_API_KEY=gsk_your_key_here   # Mac/Linux
 ```
 
-Or create a `.env` file:
-```
-OPENAI_API_KEY=sk-...
-```
-
-### 3a. Run the CLI
-
-```bash
-python cli.py --files your_document.pdf
-
-# Multiple files
-python cli.py --files report.pdf contract.docx notes.txt
-
-# Save the index so you don't re-embed next time
-python cli.py --files report.pdf --save-index
-
-# Load a saved index
-python cli.py --load-index
-```
-
-### 3b. Run the Streamlit web app
+### 6a. Run the web UI
 
 ```bash
 streamlit run app.py
@@ -80,78 +96,84 @@ streamlit run app.py
 
 Then open http://localhost:8501 in your browser.
 
----
-
-## Benchmarking
-
-The `benchmark.py` script measures query latency with a fresh vs. cached index.
-This demonstrates the "40% latency reduction via embedding optimization" on your resume.
+### 6b. Run the CLI
 
 ```bash
-python benchmark.py --files your_document.pdf --runs 3
+python cli.py --files your_document.pdf
+
+# Multiple files
+python cli.py --files report.pdf contract.docx notes.txt
+
+# Save index to avoid re-embedding next time
+python cli.py --files report.pdf --save-index
+
+# Load a saved index
+python cli.py --load-index
 ```
-
-Sample output:
-```
-Cold queries stats:
-  Mean:   2340 ms
-  Median: 2280 ms
-
-Warm queries stats:
-  Mean:   1380 ms
-  Median: 1350 ms
-
-  Latency reduction: 41.0%
-```
-
-The reduction comes from **persisting the FAISS index** — you only call the embedding
-API once per document, not on every run. Index load (~50ms) is far cheaper than
-re-embedding (~1000ms+ per batch).
 
 ---
 
-## Project Structure
+## 📁 Project Structure
 
 ```
-doc_qa/
+llm-document-qa-system/
 ├── rag_pipeline.py      # Core RAG engine (index + query)
 ├── document_loader.py   # PDF / DOCX / TXT parsers
 ├── cli.py               # Interactive command-line interface
 ├── app.py               # Streamlit web UI
-├── benchmark.py         # Latency measurement script
+├── benchmark.py         # Latency benchmarking script
 ├── requirements.txt
 └── README.md
 ```
 
 ---
 
-## Key Concepts to Know for Interviews
+## 🧠 Key Concepts for Interviews
 
 **Embeddings** — Dense vector representations of text. Semantically similar text maps
-to nearby points in vector space. `text-embedding-3-small` produces 1536-dimensional
-vectors.
+to nearby points in vector space. all-MiniLM-L6-v2 runs locally — no API cost.
 
-**Chunk overlap** — We use 100-char overlap so a sentence split across two chunks
-appears in both. Without this, retrieval misses context at chunk boundaries.
+**Chunk overlap** — 200-char overlap ensures context is not lost at chunk boundaries.
 
-**FAISS** — Facebook AI Similarity Search. Uses approximate nearest-neighbor algorithms
-(HNSW, IVF) to search millions of vectors in milliseconds. In production, swap for
-Pinecone, Weaviate, Qdrant, or pgvector.
+**FAISS** — Facebook AI Similarity Search. In-memory approximate nearest-neighbor index.
+In production, swap for Pinecone, Weaviate, Qdrant, or pgvector.
 
-**`stuff` chain type** — All retrieved chunks are concatenated ("stuffed") into a
-single prompt. Works well for k=4 chunks. For longer contexts, use `map_reduce` or
-`refine` chain types instead.
+**Auto k-selection** — Small documents get full context sent to the LLM.
+Large documents use top-k retrieval to stay within context limits.
 
-**Temperature=0** — Makes the LLM deterministic and factual. Higher values (0.7–1.0)
-make responses more creative but less reliable for factual QA.
+**Temperature=0** — Makes the LLM deterministic and factual.
+
+**Anti-hallucination prompt** — System prompt explicitly forbids outside knowledge.
+User prompt forces the model to cite exact quotes from the document.
 
 ---
 
-## Possible Extensions
+## 📊 Benchmarking
 
-- **Multi-query retrieval** — Generate multiple phrasings of the question to improve recall
-- **Hybrid search** — Combine vector similarity with BM25 keyword search
-- **Re-ranking** — Use a cross-encoder to re-rank the top-K results before sending to LLM
-- **Streaming** — Stream the LLM's response token-by-token for better UX
-- **Evaluation** — Use RAGAs or TRULENS to measure faithfulness and answer relevance
-- **Persistent storage** — Replace FAISS with a cloud vector DB (Pinecone, Supabase)
+```bash
+python benchmark.py --files your_document.pdf --runs 3
+```
+
+---
+
+## 🔧 Possible Extensions
+
+- Conversation memory — Multi-turn Q&A with context from previous questions
+- Streaming responses — Token-by-token output like ChatGPT
+- Hybrid search — Combine vector similarity with BM25 keyword search
+- Query rewriting — Rewrite vague questions for better retrieval accuracy
+- Evaluation — RAGAs or TruLens for faithfulness and relevance scoring
+- OCR support — Handle scanned PDFs using pytesseract
+
+---
+
+## 🛠️ Tech Stack
+
+| Component | Technology |
+|---|---|
+| LLM | Llama 3.3 70B via Groq (free) |
+| Embeddings | HuggingFace all-MiniLM-L6-v2 (local) |
+| Vector Store | FAISS |
+| Framework | LangChain |
+| Web UI | Streamlit |
+| Document Parsing | PyPDF, Docx2txt |
